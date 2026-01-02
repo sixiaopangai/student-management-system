@@ -77,6 +77,7 @@ student-management-system/
 │   │   └── init.sql       # 初始化SQL
 │   ├── scripts/            # 工具脚本
 │   │   ├── init-db.js     # 数据库初始化脚本
+│   │   ├── init-test-db.js # 测试数据库初始化脚本
 │   │   └── verify-db.js   # 数据库验证脚本
 │   ├── src/
 │   │   ├── config/        # 配置文件
@@ -87,7 +88,9 @@ student-management-system/
 │   │   ├── services/      # 业务服务
 │   │   ├── utils/         # 工具函数
 │   │   └── app.js         # 应用入口
+│   ├── __tests__/         # 测试文件
 │   ├── .env.example       # 环境变量示例
+│   ├── .env.test          # 测试环境配置（需自行创建）
 │   └── package.json
 ├── frontend/               # 前端项目
 │   ├── public/
@@ -291,13 +294,49 @@ chore: 构建/工具相关
 
 ## 测试
 
-### 运行测试
+### 测试数据库配置
+
+项目使用独立的测试数据库，与开发数据库完全隔离：
+
 ```bash
-# 后端测试
+cd backend
+
+# 1. 创建测试环境配置文件
+cp .env.example .env.test
+
+# 2. 编辑 .env.test，设置测试数据库名称
+# DB_NAME=student_management_test
+
+# 3. 初始化测试数据库
+npm run init-test-db
+```
+
+### 运行测试
+
+```bash
+# 后端单元测试
 cd backend && npm test
+
+# 后端集成测试（自动重置测试数据库）
+cd backend && npm run test:integration
 
 # 前端测试
 cd frontend && npm test
+```
+
+### 测试数据库管理
+
+```bash
+cd backend
+
+# 初始化测试数据库
+npm run init-test-db
+
+# 重置测试数据库（删除后重新创建）
+npm run init-test-db:reset
+
+# 清理测试数据库（仅删除）
+npm run init-test-db:clean
 ```
 
 ### 测试报告

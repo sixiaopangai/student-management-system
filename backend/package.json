@@ -12,9 +12,13 @@
     "test:watch": "jest --watch",
     "test:unit": "jest --testPathPattern=__tests__/(?!integration) --coverage",
     "test:integration": "jest --testPathPattern=__tests__/integration --runInBand --detectOpenHandles",
-    "init-test-data": "node scripts/init-test-data.js",
     "init-db": "node scripts/init-db.js",
-    "verify-db": "node scripts/verify-db.js"
+    "init-test-db": "node scripts/init-test-db.js",
+    "init-test-db:reset": "node scripts/init-test-db.js reset",
+    "init-test-db:clean": "node scripts/init-test-db.js clean",
+    "init-test-data": "node scripts/init-test-data.js",
+    "verify-db": "node scripts/verify-db.js",
+    "pretest:integration": "node scripts/init-test-db.js reset"
   },
   "keywords": [
     "student",

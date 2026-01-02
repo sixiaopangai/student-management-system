@@ -2,6 +2,25 @@
 
 一个基于前后端分离架构的学生管理系统，支持多角色权限管理。
 
+## 项目截图
+
+### 登录界面
+![登录界面](项目成品展示images/1.登陆界面.png)
+
+### 管理员首页
+![管理员首页](项目成品展示images/4.管理员首页界面.png)
+
+### 用户管理
+![用户管理](项目成品展示images/7.用户管理界面-1.png)
+
+### 专业班级管理
+![专业班级管理](项目成品展示images/8.专业班级管理界面.png)
+
+### 课程班级管理
+![课程班级管理](项目成品展示images/9.课程班级管理界面.png)
+
+更多截图请查看 [项目成品展示images](项目成品展示images/) 目录
+
 ## 技术栈
 
 ### 后端
@@ -89,7 +108,8 @@ student-management-system/
 │   ├── index.html
 │   ├── vite.config.js
 │   └── package.json
-└── docs/                   # 项目文档
+├── docs/                   # 项目文档
+└── 项目成品展示images/      # 项目截图
 ```
 
 ## 快速开始
@@ -101,7 +121,7 @@ student-management-system/
 
 ### 1. 克隆项目
 ```bash
-git clone <repository-url>
+git clone https://github.com/sixiaopangai/student-management-system.git
 cd student-management-system
 ```
 
@@ -312,6 +332,10 @@ npm run build
 | [测试报告](docs/学生管理系统_测试报告.md) | 测试结果报告 |
 | [运行说明](docs/学生管理系统_运行说明.md) | 项目运行指南 |
 | [变更记录](docs/学生管理系统_变更记录.md) | 版本变更历史 |
+
+## 作者
+
+- GitHub: [@sixiaopangai](https://github.com/sixiaopangai)
 
 ## 许可证
 

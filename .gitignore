@@ -1,19 +1,36 @@
-# 依赖包
+# Dependencies
 node_modules/
-dist/
 
-# 环境配置文件
+# Build outputs
+dist/
+build/
+
+# Environment files
 .env
 .env.local
-.env.production
+.env.*.local
 
-# 操作系统临时文件
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
 Thumbs.db
 
-# 编辑器配置
-.vscode/
-.idea/
-*.suo
-*.ntvs*
-*.njsproj
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test coverage
+coverage/
+
+# Temporary files
+tmp/
+temp/
+*.tmp

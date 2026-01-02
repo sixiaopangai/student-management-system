@@ -2,7 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
-const { testConnection } = require('./config/database');
+const { testConnection, pool } = require('./config/database');
 const registerRoutes = require('./routes');
 const { errorHandler, notFoundHandler } = require('./middlewares/errorHandler');
 
@@ -67,6 +67,19 @@ async function startServer() {
   }
 }
 
-startServer();
+// 关闭数据库连接池
+async function closeDatabase() {
+  try {
+    await pool.end();
+    console.log('数据库连接池已关闭');
+  } catch (error) {
+    console.error('关闭数据库连接池失败:', error.message);
+  }
+}
 
-module.exports = app;
+// 只在非测试环境下自动启动服务器
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
+}
+
+module.exports = { app, startServer, closeDatabase };

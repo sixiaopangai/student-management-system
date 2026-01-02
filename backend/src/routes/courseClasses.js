@@ -102,6 +102,17 @@ router.post('/:id/students/batch', [
 ], CourseClassController.batchAddStudents);
 
 /**
+ * 批量审批通过学生
+ * POST /api/v1/course-classes/:id/students/batch-approve
+ */
+router.post('/:id/students/batch-approve', [
+  authorize(Roles.ADMIN, Roles.TEACHER),
+  param('id').isInt().withMessage('班级ID必须是整数'),
+  body('studentIds').isArray().withMessage('studentIds必须是数组'),
+  handleValidation
+], CourseClassController.batchApproveStudents);
+
+/**
  * 批量从课程班级移除学生
  * DELETE /api/v1/course-classes/:id/students/batch
  */
@@ -111,6 +122,28 @@ router.delete('/:id/students/batch', [
   body('studentIds').isArray().withMessage('studentIds必须是数组'),
   handleValidation
 ], CourseClassController.batchRemoveStudents);
+
+/**
+ * 审批通过学生
+ * PUT /api/v1/course-classes/:id/students/:studentId/approve
+ */
+router.put('/:id/students/:studentId/approve', [
+  authorize(Roles.ADMIN, Roles.TEACHER),
+  param('id').isInt().withMessage('班级ID必须是整数'),
+  param('studentId').isInt().withMessage('学生ID必须是整数'),
+  handleValidation
+], CourseClassController.approveStudent);
+
+/**
+ * 审批拒绝学生
+ * PUT /api/v1/course-classes/:id/students/:studentId/reject
+ */
+router.put('/:id/students/:studentId/reject', [
+  authorize(Roles.ADMIN, Roles.TEACHER),
+  param('id').isInt().withMessage('班级ID必须是整数'),
+  param('studentId').isInt().withMessage('学生ID必须是整数'),
+  handleValidation
+], CourseClassController.rejectStudent);
 
 /**
  * 从课程班级移除学生

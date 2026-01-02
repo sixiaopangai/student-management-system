@@ -36,7 +36,7 @@
         
         <el-form-item>
           <div class="form-options">
-            <el-checkbox v-model="form.rememberMe">记住我</el-checkbox>
+            <el-checkbox v-model="form.rememberMe">记住密码</el-checkbox>
             <router-link to="/forgot-password" class="forgot-link">
               忘记密码？
             </router-link>
@@ -60,25 +60,16 @@
           <router-link to="/register">立即注册</router-link>
         </div>
       </el-form>
-      
-      <div class="demo-accounts">
-        <el-divider>测试账号</el-divider>
-        <div class="account-list">
-          <el-tag @click="fillAccount('admin', 'admin123')">管理员</el-tag>
-          <el-tag type="success" @click="fillAccount('teacher001', 'admin123')">教师</el-tag>
-          <el-tag type="warning" @click="fillAccount('counselor001', 'admin123')">辅导员</el-tag>
-          <el-tag type="info" @click="fillAccount('student001', 'admin123')">学生</el-tag>
-        </div>
-      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/store'
+import { getRememberedCredentials } from '@/utils/token'
 
 const router = useRouter()
 const route = useRoute()
@@ -102,6 +93,16 @@ const rules = {
   ]
 }
 
+// 页面加载时检查是否有记住的用户凭证
+onMounted(() => {
+  const { remembered, username, password } = getRememberedCredentials()
+  if (remembered) {
+    form.username = username
+    form.password = password
+    form.rememberMe = true
+  }
+})
+
 const handleLogin = async () => {
   if (!formRef.value) return
   
@@ -120,11 +121,6 @@ const handleLogin = async () => {
   } finally {
     loading.value = false
   }
-}
-
-const fillAccount = (username, password) => {
-  form.username = username
-  form.password = password
 }
 </script>
 
@@ -186,24 +182,6 @@ const fillAccount = (username, password) => {
   
   a {
     color: #409eff;
-  }
-}
-
-.demo-accounts {
-  margin-top: 20px;
-  
-  .account-list {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    
-    .el-tag {
-      cursor: pointer;
-      
-      &:hover {
-        opacity: 0.8;
-      }
-    }
   }
 }
 </style>

@@ -24,7 +24,21 @@ class UserController {
         status
       });
 
-      return Response.paginate(res, result.list, result.total, page, pageSize);
+      // 格式化返回数据，将数据库字段映射为驼峰命名
+      const list = result.list.map(user => ({
+        id: user.id,
+        username: user.username,
+        realName: user.real_name,
+        role: user.role,
+        email: user.email,
+        phone: user.phone,
+        avatar: user.avatar,
+        status: user.status,
+        createdAt: user.created_at,
+        updatedAt: user.updated_at
+      }));
+
+      return Response.paginate(res, list, result.total, page, pageSize);
     } catch (error) {
       next(error);
     }
@@ -320,6 +334,19 @@ class UserController {
       await User.update(userId, updateData);
 
       return Response.success(res, null, '更新成功');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 获取统计数据
+   * GET /api/v1/users/stats
+   */
+  static async getStats(req, res, next) {
+    try {
+      const stats = await User.getStats();
+      return Response.success(res, stats, '获取成功');
     } catch (error) {
       next(error);
     }

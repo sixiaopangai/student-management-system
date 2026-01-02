@@ -133,11 +133,15 @@ class MajorClass {
 
   /**
    * 获取专业班级列表
+   * 支持按班级名称、编码、辅导员姓名搜索
    * @param {Object} options - 查询选项
    * @returns {Promise<Object>} 班级列表和总数
    */
   static async findAll(options = {}) {
-    const { page = 1, pageSize = 10, keyword, status, counselorId } = options;
+    // 确保 page 和 pageSize 是整数
+    const page = parseInt(options.page, 10) || 1;
+    const pageSize = parseInt(options.pageSize, 10) || 10;
+    const { keyword, status, counselorId } = options;
     const offset = (page - 1) * pageSize;
     
     let whereClauses = [];
@@ -154,18 +158,24 @@ class MajorClass {
     }
 
     if (keyword) {
-      whereClauses.push('(mc.name LIKE ? OR mc.code LIKE ?)');
-      params.push(`%${keyword}%`, `%${keyword}%`);
+      // 支持按班级名称、编码、辅导员姓名搜索
+      whereClauses.push('(mc.name LIKE ? OR mc.code LIKE ? OR u.real_name LIKE ?)');
+      params.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
     }
 
     const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
-    // 查询总数
-    const countSql = `SELECT COUNT(*) as total FROM major_class mc ${whereClause}`;
+    // 查询总数 - 需要 JOIN user 表以支持按辅导员姓名搜索
+    const countSql = `
+      SELECT COUNT(*) as total 
+      FROM major_class mc
+      LEFT JOIN user u ON mc.counselor_id = u.id
+      ${whereClause}
+    `;
     const countResult = await query(countSql, params);
     const total = countResult[0].total;
 
-    // 查询列表
+    // 查询列表 - 使用字符串拼接确保 LIMIT 和 OFFSET 是整数
     const listSql = `
       SELECT mc.*, u.real_name as counselor_name,
         (SELECT COUNT(*) FROM student_major_class smc WHERE smc.major_class_id = mc.id AND smc.status = 'approved') as student_count
@@ -173,9 +183,9 @@ class MajorClass {
       LEFT JOIN user u ON mc.counselor_id = u.id
       ${whereClause}
       ORDER BY mc.created_at DESC
-      LIMIT ? OFFSET ?
+      LIMIT ${pageSize} OFFSET ${offset}
     `;
-    const list = await query(listSql, [...params, pageSize, offset]);
+    const list = await query(listSql, params);
 
     return { list, total };
   }
@@ -327,21 +337,61 @@ class MajorClass {
   }
 
   /**
+   * 更新学生在班级中的状态
+   * @param {number} majorClassId - 班级ID
+   * @param {number} studentId - 学生ID
+   * @param {string} status - 新状态 (approved, rejected, removed)
+   * @param {number} approvedBy - 审批人ID
+   * @param {string} remark - 备注
+   * @returns {Promise<boolean>} 是否更新成功
+   */
+  static async updateStudentStatus(majorClassId, studentId, status, approvedBy = null, remark = null) {
+    let sql;
+    let params;
+    
+    if (status === 'approved') {
+      sql = `
+        UPDATE student_major_class 
+        SET status = ?, approved_at = NOW(), approved_by = ?, remark = ?
+        WHERE major_class_id = ? AND student_id = ?
+      `;
+      params = [status, approvedBy, remark, majorClassId, studentId];
+    } else {
+      sql = `
+        UPDATE student_major_class 
+        SET status = ?, remark = ?
+        WHERE major_class_id = ? AND student_id = ?
+      `;
+      params = [status, remark, majorClassId, studentId];
+    }
+    
+    const result = await query(sql, params);
+    return result.affectedRows > 0;
+  }
+
+  /**
    * 获取专业班级的学生列表
    * @param {number} majorClassId - 班级ID
    * @param {Object} options - 查询选项
    * @returns {Promise<Object>} 学生列表和总数
    */
   static async getStudents(majorClassId, options = {}) {
-    const { page = 1, pageSize = 10, status = 'approved', keyword } = options;
+    // 确保 page 和 pageSize 是整数
+    const page = parseInt(options.page, 10) || 1;
+    const pageSize = parseInt(options.pageSize, 10) || 10;
+    const { status, keyword } = options;
     const offset = (page - 1) * pageSize;
     
     let whereClauses = ['smc.major_class_id = ?'];
     let params = [majorClassId];
 
+    // 如果指定了状态，则按状态筛选；否则显示所有非removed状态
     if (status) {
       whereClauses.push('smc.status = ?');
       params.push(status);
+    } else {
+      // 默认不显示已移除的记录
+      whereClauses.push("smc.status != 'removed'");
     }
 
     if (keyword) {
@@ -361,17 +411,24 @@ class MajorClass {
     const countResult = await query(countSql, params);
     const total = countResult[0].total;
 
-    // 查询列表
+    // 查询列表 - 使用字符串拼接确保 LIMIT 和 OFFSET 是整数
     const listSql = `
       SELECT u.id, u.username, u.real_name, u.email, u.phone, u.status as user_status,
-        smc.status, smc.joined_at, smc.approved_at
+        smc.status, smc.joined_at, smc.approved_at, smc.remark
       FROM student_major_class smc
       JOIN user u ON smc.student_id = u.id
       ${whereClause}
-      ORDER BY smc.joined_at DESC
-      LIMIT ? OFFSET ?
+      ORDER BY 
+        CASE smc.status 
+          WHEN 'pending' THEN 1 
+          WHEN 'approved' THEN 2 
+          WHEN 'rejected' THEN 3 
+          ELSE 4 
+        END,
+        smc.joined_at DESC
+      LIMIT ${pageSize} OFFSET ${offset}
     `;
-    const list = await query(listSql, [...params, pageSize, offset]);
+    const list = await query(listSql, params);
 
     return { list, total };
   }

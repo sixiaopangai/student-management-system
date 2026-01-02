@@ -120,6 +120,105 @@ class CounselorController {
   }
 
   /**
+   * 审批通过学生加入班级
+   * PUT /api/v1/counselor/my-major-classes/:id/students/:studentId/approve
+   */
+  static async approveStudent(req, res, next) {
+    try {
+      const counselorId = req.user.id;
+      const { id, studentId } = req.params;
+
+      const majorClass = await MajorClass.findById(id);
+      if (!majorClass) {
+        return Response.error(res, ErrorCodes.CLASS_NOT_FOUND);
+      }
+
+      // 验证是否是自己负责的班级
+      if (majorClass.counselor_id !== counselorId) {
+        return Response.error(res, ErrorCodes.NO_PERMISSION, '只能管理自己负责的班级');
+      }
+
+      // 更新学生状态为已通过
+      await MajorClass.updateStudentStatus(id, studentId, 'approved', counselorId);
+
+      return Response.success(res, null, '审批通过');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 审批拒绝学生加入班级
+   * PUT /api/v1/counselor/my-major-classes/:id/students/:studentId/reject
+   */
+  static async rejectStudent(req, res, next) {
+    try {
+      const counselorId = req.user.id;
+      const { id, studentId } = req.params;
+      const { reason } = req.body;
+
+      const majorClass = await MajorClass.findById(id);
+      if (!majorClass) {
+        return Response.error(res, ErrorCodes.CLASS_NOT_FOUND);
+      }
+
+      // 验证是否是自己负责的班级
+      if (majorClass.counselor_id !== counselorId) {
+        return Response.error(res, ErrorCodes.NO_PERMISSION, '只能管理自己负责的班级');
+      }
+
+      // 更新学生状态为已拒绝
+      await MajorClass.updateStudentStatus(id, studentId, 'rejected', counselorId, reason);
+
+      return Response.success(res, null, '已拒绝该申请');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 批量审批通过学生
+   * POST /api/v1/counselor/my-major-classes/:id/students/batch-approve
+   */
+  static async batchApproveStudents(req, res, next) {
+    try {
+      const counselorId = req.user.id;
+      const { id } = req.params;
+      const { studentIds } = req.body;
+
+      if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
+        return Response.error(res, ErrorCodes.VALIDATION_ERROR, '请选择要审批的学生');
+      }
+
+      const majorClass = await MajorClass.findById(id);
+      if (!majorClass) {
+        return Response.error(res, ErrorCodes.CLASS_NOT_FOUND);
+      }
+
+      // 验证是否是自己负责的班级
+      if (majorClass.counselor_id !== counselorId) {
+        return Response.error(res, ErrorCodes.NO_PERMISSION, '只能管理自己负责的班级');
+      }
+
+      // 批量更新学生状态
+      let success = 0;
+      let failed = 0;
+      for (const studentId of studentIds) {
+        try {
+          await MajorClass.updateStudentStatus(id, studentId, 'approved', counselorId);
+          success++;
+        } catch (error) {
+          failed++;
+        }
+      }
+
+      return Response.batch(res, success, failed);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * 获取我负责的所有学生列表
    * GET /api/v1/counselor/my-students
    */

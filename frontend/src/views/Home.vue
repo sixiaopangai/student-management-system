@@ -197,6 +197,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/store'
 import { RoleNames } from '@/constants/roles'
+import { getStats } from '@/api/user'
+import { getMyMajorClass, getMyCourseClasses } from '@/api/student'
+import { getMyMajorClasses } from '@/api/counselor'
+import { getMyCourseClasses as getTeacherCourseClasses } from '@/api/teacher'
 import {
   User,
   UserFilled,
@@ -236,8 +240,72 @@ const adminStats = ref({
   courseClassCount: 0
 })
 
+const loadStats = async () => {
+  try {
+    if (userRole.value === 'admin') {
+      const data = await getStats()
+      adminStats.value = {
+        userCount: data.userCount || 0,
+        majorClassCount: data.majorClassCount || 0,
+        courseClassCount: data.courseClassCount || 0
+      }
+    } else if (userRole.value === 'student') {
+      // 加载学生统计数据
+      try {
+        const majorClass = await getMyMajorClass()
+        studentStats.value.majorClass = majorClass?.name || '未加入'
+      } catch (e) {
+        studentStats.value.majorClass = '未加入'
+      }
+      
+      try {
+        const courseClasses = await getMyCourseClasses()
+        studentStats.value.courseCount = Array.isArray(courseClasses) ? courseClasses.length : 0
+      } catch (e) {
+        studentStats.value.courseCount = 0
+      }
+    } else if (userRole.value === 'teacher') {
+      // 加载教师统计数据
+      try {
+        const courseClasses = await getTeacherCourseClasses()
+        teacherStats.value.courseCount = Array.isArray(courseClasses) ? courseClasses.length : 0
+        // 计算学生总数
+        let totalStudents = 0
+        if (Array.isArray(courseClasses)) {
+          courseClasses.forEach(c => {
+            totalStudents += c.studentCount || 0
+          })
+        }
+        teacherStats.value.studentCount = totalStudents
+      } catch (e) {
+        teacherStats.value.courseCount = 0
+        teacherStats.value.studentCount = 0
+      }
+    } else if (userRole.value === 'counselor') {
+      // 加载辅导员统计数据
+      try {
+        const majorClasses = await getMyMajorClasses()
+        counselorStats.value.classCount = Array.isArray(majorClasses) ? majorClasses.length : 0
+        // 计算学生总数
+        let totalStudents = 0
+        if (Array.isArray(majorClasses)) {
+          majorClasses.forEach(c => {
+            totalStudents += c.studentCount || 0
+          })
+        }
+        counselorStats.value.studentCount = totalStudents
+      } catch (e) {
+        counselorStats.value.classCount = 0
+        counselorStats.value.studentCount = 0
+      }
+    }
+  } catch (error) {
+    console.error('加载统计数据失败:', error)
+  }
+}
+
 onMounted(() => {
-  // TODO: 根据角色加载统计数据
+  loadStats()
 })
 </script>
 

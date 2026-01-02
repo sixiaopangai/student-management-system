@@ -36,6 +36,37 @@ router.get('/my-major-classes/:id/students', [
 ], CounselorController.getMyMajorClassStudents);
 
 /**
+ * 审批通过学生加入班级
+ * PUT /api/v1/counselor/my-major-classes/:id/students/:studentId/approve
+ */
+router.put('/my-major-classes/:id/students/:studentId/approve', [
+  param('id').isInt().withMessage('班级ID必须是整数'),
+  param('studentId').isInt().withMessage('学生ID必须是整数'),
+  handleValidation
+], CounselorController.approveStudent);
+
+/**
+ * 审批拒绝学生加入班级
+ * PUT /api/v1/counselor/my-major-classes/:id/students/:studentId/reject
+ */
+router.put('/my-major-classes/:id/students/:studentId/reject', [
+  param('id').isInt().withMessage('班级ID必须是整数'),
+  param('studentId').isInt().withMessage('学生ID必须是整数'),
+  body('reason').optional().isString().withMessage('拒绝原因必须是字符串'),
+  handleValidation
+], CounselorController.rejectStudent);
+
+/**
+ * 批量审批通过学生
+ * POST /api/v1/counselor/my-major-classes/:id/students/batch-approve
+ */
+router.post('/my-major-classes/:id/students/batch-approve', [
+  param('id').isInt().withMessage('班级ID必须是整数'),
+  body('studentIds').isArray().withMessage('studentIds必须是数组'),
+  handleValidation
+], CounselorController.batchApproveStudents);
+
+/**
  * 获取我负责的所有学生列表
  * GET /api/v1/counselor/my-students
  */

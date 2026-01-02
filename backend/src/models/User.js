@@ -12,7 +12,7 @@ class User {
    */
   static async findById(id) {
     const sql = `
-      SELECT id, username, real_name, role, email, phone, avatar, status, created_at, updated_at
+      SELECT id, username, real_name, employee_id, student_id, role, email, phone, avatar, status, created_at, updated_at
       FROM user
       WHERE id = ?
     `;
@@ -27,7 +27,7 @@ class User {
    */
   static async findByUsername(username) {
     const sql = `
-      SELECT id, username, password, real_name, role, email, phone, avatar, status, created_at, updated_at
+      SELECT id, username, password, real_name, employee_id, student_id, role, email, phone, avatar, status, created_at, updated_at
       FROM user
       WHERE username = ?
     `;
@@ -42,11 +42,41 @@ class User {
    */
   static async findByEmail(email) {
     const sql = `
-      SELECT id, username, real_name, role, email, phone, avatar, status, created_at, updated_at
+      SELECT id, username, real_name, employee_id, student_id, role, email, phone, avatar, status, created_at, updated_at
       FROM user
       WHERE email = ?
     `;
     const results = await query(sql, [email]);
+    return results[0] || null;
+  }
+
+  /**
+   * 根据职工号查找用户
+   * @param {string} employeeId - 职工号
+   * @returns {Promise<Object|null>} 用户对象
+   */
+  static async findByEmployeeId(employeeId) {
+    const sql = `
+      SELECT id, username, real_name, employee_id, student_id, role, email, phone, avatar, status, created_at, updated_at
+      FROM user
+      WHERE employee_id = ?
+    `;
+    const results = await query(sql, [employeeId]);
+    return results[0] || null;
+  }
+
+  /**
+   * 根据学号查找用户
+   * @param {string} studentId - 学号
+   * @returns {Promise<Object|null>} 用户对象
+   */
+  static async findByStudentId(studentId) {
+    const sql = `
+      SELECT id, username, real_name, employee_id, student_id, role, email, phone, avatar, status, created_at, updated_at
+      FROM user
+      WHERE student_id = ?
+    `;
+    const results = await query(sql, [studentId]);
     return results[0] || null;
   }
 
@@ -56,21 +86,32 @@ class User {
    * @returns {Promise<Object>} 创建的用户
    */
   static async create(userData) {
-    const { username, password, realName, role = 'student', email, phone } = userData;
+    const { username, password, realName, employeeId, studentId, role = 'student', email, phone } = userData;
     
     // 加密密码
     const hashedPassword = await PasswordUtil.hash(password);
     
     const sql = `
-      INSERT INTO user (username, password, real_name, role, email, phone)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO user (username, password, real_name, employee_id, student_id, role, email, phone)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    const result = await query(sql, [username, hashedPassword, realName, role, email || null, phone || null]);
+    const result = await query(sql, [
+      username, 
+      hashedPassword, 
+      realName, 
+      employeeId || null, 
+      studentId || null, 
+      role, 
+      email || null, 
+      phone || null
+    ]);
     
     return {
       id: result.insertId,
       username,
       realName,
+      employeeId,
+      studentId,
       role,
       email,
       phone
@@ -101,6 +142,34 @@ class User {
           continue;
         }
 
+        // 检查学号是否存在（如果提供了学号）
+        if (userData.studentId) {
+          const existingStudent = await User.findByStudentId(userData.studentId);
+          if (existingStudent) {
+            results.push({
+              username: userData.username,
+              status: 'failed',
+              error: { code: 10001, message: '学号已存在' }
+            });
+            failed++;
+            continue;
+          }
+        }
+
+        // 检查职工号是否存在（如果提供了职工号）
+        if (userData.employeeId) {
+          const existingEmployee = await User.findByEmployeeId(userData.employeeId);
+          if (existingEmployee) {
+            results.push({
+              username: userData.username,
+              status: 'failed',
+              error: { code: 10001, message: '职工号已存在' }
+            });
+            failed++;
+            continue;
+          }
+        }
+
         const user = await User.create(userData);
         results.push({
           username: userData.username,
@@ -128,13 +197,15 @@ class User {
    * @returns {Promise<boolean>} 是否更新成功
    */
   static async update(id, userData) {
-    const allowedFields = ['real_name', 'email', 'phone', 'avatar', 'status'];
+    const allowedFields = ['real_name', 'employee_id', 'student_id', 'email', 'phone', 'avatar', 'status'];
     const updates = [];
     const values = [];
 
     // 字段名映射
     const fieldMap = {
-      realName: 'real_name'
+      realName: 'real_name',
+      employeeId: 'employee_id',
+      studentId: 'student_id'
     };
 
     for (const [key, value] of Object.entries(userData)) {
@@ -219,7 +290,10 @@ class User {
    * @returns {Promise<Object>} 用户列表和总数
    */
   static async findAll(options = {}) {
-    const { page = 1, pageSize = 10, role, keyword, status } = options;
+    // 确保 page 和 pageSize 是整数
+    const page = parseInt(options.page, 10) || 1;
+    const pageSize = parseInt(options.pageSize, 10) || 10;
+    const { role, keyword, status } = options;
     const offset = (page - 1) * pageSize;
     
     let whereClauses = [];
@@ -236,8 +310,8 @@ class User {
     }
 
     if (keyword) {
-      whereClauses.push('(username LIKE ? OR real_name LIKE ?)');
-      params.push(`%${keyword}%`, `%${keyword}%`);
+      whereClauses.push('(username LIKE ? OR real_name LIKE ? OR employee_id LIKE ? OR student_id LIKE ?)');
+      params.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
     }
 
     const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -247,15 +321,15 @@ class User {
     const countResult = await query(countSql, params);
     const total = countResult[0].total;
 
-    // 查询列表
+    // 查询列表 - 确保 LIMIT 和 OFFSET 是整数
     const listSql = `
-      SELECT id, username, real_name, role, email, phone, avatar, status, created_at, updated_at
+      SELECT id, username, real_name, employee_id, student_id, role, email, phone, avatar, status, created_at, updated_at
       FROM user
       ${whereClause}
       ORDER BY created_at DESC
-      LIMIT ? OFFSET ?
+      LIMIT ${pageSize} OFFSET ${offset}
     `;
-    const list = await query(listSql, [...params, pageSize, offset]);
+    const list = await query(listSql, params);
 
     return { list, total };
   }
@@ -272,7 +346,7 @@ class User {
 
     const placeholders = ids.map(() => '?').join(',');
     const sql = `
-      SELECT id, username, real_name, role, email, phone, avatar, status, created_at, updated_at
+      SELECT id, username, real_name, employee_id, student_id, role, email, phone, avatar, status, created_at, updated_at
       FROM user
       WHERE id IN (${placeholders})
     `;
@@ -292,6 +366,45 @@ class User {
    */
   static async verifyPassword(password, hashedPassword) {
     return PasswordUtil.compare(password, hashedPassword);
+  }
+
+  /**
+   * 获取统计数据
+   * @returns {Promise<Object>} 统计数据
+   */
+  static async getStats() {
+    // 用户总数
+    const userCountSql = `SELECT COUNT(*) as count FROM user`;
+    const userCountResult = await query(userCountSql);
+    const userCount = userCountResult[0].count;
+
+    // 各角色用户数
+    const roleCountSql = `SELECT role, COUNT(*) as count FROM user GROUP BY role`;
+    const roleCountResult = await query(roleCountSql);
+    const roleStats = {};
+    roleCountResult.forEach(item => {
+      roleStats[item.role] = item.count;
+    });
+
+    // 专业班级数
+    const majorClassCountSql = `SELECT COUNT(*) as count FROM major_class WHERE status = 'active'`;
+    const majorClassCountResult = await query(majorClassCountSql);
+    const majorClassCount = majorClassCountResult[0].count;
+
+    // 课程班级数
+    const courseClassCountSql = `SELECT COUNT(*) as count FROM course_class WHERE status = 'active'`;
+    const courseClassCountResult = await query(courseClassCountSql);
+    const courseClassCount = courseClassCountResult[0].count;
+
+    return {
+      userCount,
+      studentCount: roleStats.student || 0,
+      teacherCount: roleStats.teacher || 0,
+      counselorCount: roleStats.counselor || 0,
+      adminCount: roleStats.admin || 0,
+      majorClassCount,
+      courseClassCount
+    };
   }
 }
 

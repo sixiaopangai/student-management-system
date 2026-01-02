@@ -20,11 +20,19 @@
           @clear="loadStudents"
           @keyup.enter="loadStudents"
         />
+        <el-select v-model="statusFilter" placeholder="状态筛选" clearable style="width: 120px; margin-left: 10px" @change="loadStudents">
+          <el-option label="全部" value="" />
+          <el-option label="待审批" value="pending" />
+          <el-option label="已通过" value="approved" />
+        </el-select>
         <el-button type="primary" @click="loadStudents">搜索</el-button>
       </div>
       <div class="toolbar-right">
-        <el-button type="danger" :disabled="selectedIds.length === 0" @click="handleBatchRemove">
-          批量移除 ({{ selectedIds.length }})
+        <el-button type="success" :disabled="pendingSelectedIds.length === 0" @click="handleBatchApprove">
+          批量通过 ({{ pendingSelectedIds.length }})
+        </el-button>
+        <el-button type="danger" :disabled="approvedSelectedIds.length === 0" @click="handleBatchRemove">
+          批量移除 ({{ approvedSelectedIds.length }})
         </el-button>
       </div>
     </div>
@@ -40,21 +48,41 @@
       <el-table-column prop="realName" label="姓名" width="100" />
       <el-table-column prop="email" label="邮箱" />
       <el-table-column prop="phone" label="手机号" width="130" />
+      <el-table-column prop="status" label="状态" width="100">
+        <template #default="{ row }">
+          <el-tag :type="getStatusType(row.status)">
+            {{ getStatusText(row.status) }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="joinedAt" label="加入时间" width="180">
         <template #default="{ row }">
           {{ formatDate(row.joinedAt) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="100" fixed="right">
+      <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
-          <el-popconfirm
-            title="确定要将该学生移出课程吗？"
-            @confirm="handleRemove(row.id)"
-          >
-            <template #reference>
-              <el-button type="danger" link>移除</el-button>
-            </template>
-          </el-popconfirm>
+          <template v-if="row.status === 'pending'">
+            <el-button type="success" link @click="handleApprove(row.id)">通过</el-button>
+            <el-popconfirm
+              title="确定要拒绝该学生的申请吗？"
+              @confirm="handleReject(row.id)"
+            >
+              <template #reference>
+                <el-button type="warning" link>拒绝</el-button>
+              </template>
+            </el-popconfirm>
+          </template>
+          <template v-else-if="row.status === 'approved'">
+            <el-popconfirm
+              title="确定要将该学生移出课程吗？"
+              @confirm="handleRemove(row.id)"
+            >
+              <template #reference>
+                <el-button type="danger" link>移除</el-button>
+              </template>
+            </el-popconfirm>
+          </template>
         </template>
       </el-table-column>
     </el-table>
@@ -75,12 +103,17 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import request from '@/utils/request'
-import { removeStudentFromCourseClass, batchRemoveStudentsFromCourseClass } from '@/api/courseClass'
+import { 
+  removeStudentFromCourseClass, 
+  batchRemoveStudentsFromCourseClass,
+  approveStudentInCourseClass,
+  rejectStudentInCourseClass
+} from '@/api/courseClass'
 
 const route = useRoute()
 const courseId = route.params.id
@@ -89,13 +122,38 @@ const loading = ref(false)
 const courseInfo = ref(null)
 const students = ref([])
 const searchKeyword = ref('')
-const selectedIds = ref([])
+const statusFilter = ref('')
+const selectedRows = ref([])
+
+const selectedIds = computed(() => selectedRows.value.map(item => item.id))
+const pendingSelectedIds = computed(() => 
+  selectedRows.value.filter(item => item.status === 'pending').map(item => item.id)
+)
+const approvedSelectedIds = computed(() => 
+  selectedRows.value.filter(item => item.status === 'approved').map(item => item.id)
+)
 
 const pagination = reactive({
   page: 1,
   pageSize: 10,
   total: 0
 })
+
+const getStatusType = (status) => {
+  const types = {
+    pending: 'warning',
+    approved: 'success'
+  }
+  return types[status] || 'info'
+}
+
+const getStatusText = (status) => {
+  const texts = {
+    pending: '待审批',
+    approved: '已通过'
+  }
+  return texts[status] || status
+}
 
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
@@ -113,13 +171,15 @@ const loadCourseInfo = async () => {
 const loadStudents = async () => {
   loading.value = true
   try {
-    const res = await request.get(`/teacher/my-course-classes/${courseId}/students`, {
-      params: {
-        page: pagination.page,
-        pageSize: pagination.pageSize,
-        keyword: searchKeyword.value
-      }
-    })
+    const params = {
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      keyword: searchKeyword.value
+    }
+    if (statusFilter.value) {
+      params.status = statusFilter.value
+    }
+    const res = await request.get(`/teacher/my-course-classes/${courseId}/students`, { params })
     students.value = res.list
     pagination.total = res.pagination.total
   } catch (error) {
@@ -130,7 +190,27 @@ const loadStudents = async () => {
 }
 
 const handleSelectionChange = (selection) => {
-  selectedIds.value = selection.map(item => item.id)
+  selectedRows.value = selection
+}
+
+const handleApprove = async (studentId) => {
+  try {
+    await approveStudentInCourseClass(courseId, studentId)
+    ElMessage.success('审批通过')
+    loadStudents()
+  } catch (error) {
+    console.error('审批失败:', error)
+  }
+}
+
+const handleReject = async (studentId) => {
+  try {
+    await rejectStudentInCourseClass(courseId, studentId)
+    ElMessage.success('已拒绝')
+    loadStudents()
+  } catch (error) {
+    console.error('拒绝失败:', error)
+  }
 }
 
 const handleRemove = async (studentId) => {
@@ -143,15 +223,50 @@ const handleRemove = async (studentId) => {
   }
 }
 
+const handleBatchApprove = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要批量通过选中的 ${pendingSelectedIds.value.length} 名学生吗？`,
+      '批量审批',
+      { type: 'warning' }
+    )
+    
+    // 逐个审批
+    let success = 0
+    let failed = 0
+    for (const studentId of pendingSelectedIds.value) {
+      try {
+        await approveStudentInCourseClass(courseId, studentId)
+        success++
+      } catch {
+        failed++
+      }
+    }
+    
+    if (failed > 0) {
+      ElMessage.warning(`审批完成：成功 ${success} 人，失败 ${failed} 人`)
+    } else {
+      ElMessage.success(`成功审批 ${success} 名学生`)
+    }
+    
+    selectedRows.value = []
+    loadStudents()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('批量审批失败:', error)
+    }
+  }
+}
+
 const handleBatchRemove = async () => {
   try {
     await ElMessageBox.confirm(
-      `确定要移除选中的 ${selectedIds.value.length} 名学生吗？`,
+      `确定要移除选中的 ${approvedSelectedIds.value.length} 名学生吗？`,
       '批量移除',
       { type: 'warning' }
     )
     
-    const result = await batchRemoveStudentsFromCourseClass(courseId, selectedIds.value)
+    const result = await batchRemoveStudentsFromCourseClass(courseId, approvedSelectedIds.value)
     
     if (result.failed > 0) {
       ElMessage.warning(`移除完成：成功 ${result.success} 人，失败 ${result.failed} 人`)
@@ -159,7 +274,7 @@ const handleBatchRemove = async () => {
       ElMessage.success(`成功移除 ${result.success} 名学生`)
     }
     
-    selectedIds.value = []
+    selectedRows.value = []
     loadStudents()
   } catch (error) {
     if (error !== 'cancel') {

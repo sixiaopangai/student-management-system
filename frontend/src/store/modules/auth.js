@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { login as loginApi, getCurrentUser, logout as logoutApi } from '@/api/auth'
-import { setToken, getToken, removeToken } from '@/utils/token'
+import { setToken, getToken, removeToken, saveRememberedCredentials, clearRememberedCredentials } from '@/utils/token'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -23,7 +23,18 @@ export const useAuthStore = defineStore('auth', {
         const { token, userInfo } = await loginApi(credentials)
         this.token = token
         this.userInfo = userInfo
-        setToken(token)
+        
+        // 根据"记住我"选项决定存储方式
+        const remember = credentials.rememberMe || false
+        setToken(token, remember)
+        
+        // 如果勾选了"记住我"，保存用户名和密码
+        if (remember) {
+          saveRememberedCredentials(credentials.username, credentials.password)
+        } else {
+          clearRememberedCredentials()
+        }
+        
         return userInfo
       } catch (error) {
         this.token = null

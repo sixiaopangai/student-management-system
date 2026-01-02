@@ -44,3 +44,8 @@ export function batchDeleteUsers(ids) {
 export function updateProfile(data) {
   return request.put('/users/profile', data)
 }
+
+// 获取统计数据
+export function getStats() {
+  return request.get('/users/stats')
+}

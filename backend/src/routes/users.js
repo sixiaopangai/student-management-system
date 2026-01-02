@@ -10,6 +10,14 @@ const router = express.Router();
 router.use(authenticate);
 
 /**
+ * 获取统计数据
+ * GET /api/v1/users/stats
+ */
+router.get('/stats', [
+  authorize(Roles.ADMIN)
+], UserController.getStats);
+
+/**
  * 获取用户列表
  * GET /api/v1/users
  */
